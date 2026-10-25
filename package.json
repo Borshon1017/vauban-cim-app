@@ -1,0 +1,23 @@
+{
+  "name": "vauban-cim-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "data": "node tools/build-data.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource-variable/figtree": "^5.3.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "maplibre-gl": "^4.7.1"
+  },
+  "devDependencies": {
+    "proj4": "^2.22.0",
+    "shapefile": "^0.6.6",
+    "vite": "^5.4.0"
+  }
+}
