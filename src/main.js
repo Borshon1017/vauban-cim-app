@@ -3,8 +3,9 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { createClient } from '@supabase/supabase-js';
 import './style.css';
 import { T, DEFAULT_LANG, CATEGORY_FALLBACK } from './i18n.js';
-import { VAUBAN_RING, BBOX, inVauban } from './vauban.js';
+import { VAUBAN_RING, BBOX, inVauban, snapInside } from './vauban.js';
 import { addVaubanLayers, LAYER_KEYS, LAYER_DEFAULTS } from './layers.js';
+import { initChat } from './chat.js';
 
 /* ---------- config ---------- */
 const URL = import.meta.env.VITE_SUPABASE_URL;
@@ -57,6 +58,7 @@ function setLang(next) {
   if (!T[next] || next === lang) return;
   lang = next; store.set('lang', lang);
   applyStatic(); renderFormTopic(false); renderLegend(); renderPickHelp(); renderPosNote(); renderDetail(); renderInfoVersion(); setCtrlLabels(); setMsg(msgKey); syncDateField(); buildTimeSelects();
+  chat.render();
 }
 document.querySelectorAll('[data-lang]').forEach((b) => { b.onclick = () => setLang(b.dataset.lang); });
 
@@ -330,10 +332,10 @@ function commentsHtml(p) {
 function showDetail(p) { detailProps = p; renderDetail(); }
 function hideDetail() { detailProps = null; $('detail').hidden = true; }
 
-/* Experimental 3D view: hidden in Settings, off by default. The main map is flat 2D. */
+/* 3D view: the cube button next to the topics. Off on every visit; the map opens flat. */
 let view3d = false;
 function set3d(on) {
-  view3d = on; $('set-3d').checked = on;
+  view3d = on; $('btn-3d').setAttribute('aria-pressed', String(on));
   applyLayers();
   map.setMaxPitch(on ? 70 : 0);
   const act = on ? 'enable' : 'disable';
@@ -353,7 +355,7 @@ document.querySelectorAll('input[data-layer]').forEach((el) => {
 });
 $('btn-settings').onclick = () => openDialog($('settings'));
 $('s-close').onclick = () => closeDialog($('settings'), $('btn-settings'));
-$('set-3d').onchange = () => set3d($('set-3d').checked);
+$('btn-3d').onclick = () => set3d(!view3d);
 
 /* ---------- toast ---------- */
 let toastTimer;
@@ -424,7 +426,8 @@ function setPhase(p) {
   $('crosshair').hidden = p !== 'pick';
   $('sheet').hidden = p !== 'form';
   $('btn-settings').disabled = p !== 'idle';
-  if (p !== 'idle') { hideDetail(); $('toast').hidden = true; }
+  $('btn-chat').disabled = p !== 'idle';
+  if (p !== 'idle') { hideDetail(); $('toast').hidden = true; chat.close(); }
   if (p === 'idle') {
     reportMode = null; fix = null; fixState = null; locating = false; locateSeq++; chosen = null;
     $('form').reset(); $('more').open = false; setMsg(null); renderRatings();
@@ -464,11 +467,15 @@ function locate() {
     (pos) => {
       if (stale()) return;
       locating = false; syncNext();
-      const { longitude: lng, latitude: lat, accuracy: acc } = pos.coords;
-      if (!inBox(lng, lat)) { fixState = 'outside'; setPickHelp('pick.now.outside'); return; }
-      fix = { lng, lat, acc }; fixState = 'ok';
+      const { longitude: gLng, latitude: gLat, accuracy: acc } = pos.coords;
+      // allow for GPS error near the boundary: a fix just outside the line is put on the closest point inside
+      const p = snapInside(gLng, gLat, acc);
+      if (!p) { fixState = 'outside'; setPickHelp('pick.now.outside'); return; }
+      const { lng, lat } = p;
+      fix = { lng, lat, acc: p.snapped ? Math.max(acc, 30) : acc }; fixState = 'ok';
       map.flyTo({ center: [lng, lat], zoom: 17.5, duration: 600 });
-      setPickHelp(acc > LOW_ACC_M ? 'pick.now.lowacc' : 'pick.now.found', { m: Math.round(acc) });
+      if (p.snapped) setPickHelp('pick.now.edge');
+      else setPickHelp(acc > LOW_ACC_M ? 'pick.now.lowacc' : 'pick.now.found', { m: Math.round(acc) });
     },
     () => { if (stale()) return; locating = false; syncNext(); fixState = 'fail'; setPickHelp('pick.now.fail'); },
     { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
@@ -693,6 +700,11 @@ $('form').addEventListener('submit', async (e) => {
 });
 
 /* ---------- boot ---------- */
+const chat = initChat({ map, t, getLang: () => lang, $, dark: DARK });
+/* the assistant is experimental: off until switched on in Settings, remembered on this phone */
+$('set-chat').checked = store.get('chat') === '1';
+chat.setEnabled($('set-chat').checked);
+$('set-chat').onchange = () => { store.set('chat', $('set-chat').checked ? '1' : '0'); chat.setEnabled($('set-chat').checked); };
 document.body.dataset.topic = topic;
 applyStatic(); renderFormTopic(false); renderLegend(); renderPickHelp(); renderInfoVersion(); setCtrlLabels(); buildTimeSelects();
 setPhase('idle');

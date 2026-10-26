@@ -1,0 +1,4 @@
+agent/.venv
+agent/.env
+node_modules
+.git

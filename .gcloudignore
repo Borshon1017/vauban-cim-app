@@ -1,0 +1,12 @@
+# what is NOT uploaded to Google Cloud Build
+.git
+.gitignore
+node_modules
+dist
+.env
+.env.local
+agent/.env
+agent/.venv
+**/__pycache__
+.pytest_cache
+.DS_Store

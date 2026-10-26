@@ -1,0 +1,6 @@
+# Builds the agent image on Google Cloud Build (no Docker needed locally):
+#   gcloud builds submit --config cloudbuild.agent.yaml --substitutions=_IMAGE=REGION-docker.pkg.dev/PROJECT/vauban/agent
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "agent/Dockerfile", "-t", "${_IMAGE}", "."]
+images: ["${_IMAGE}"]

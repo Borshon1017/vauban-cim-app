@@ -13,3 +13,36 @@ export function inVauban(lng, lat) {
   }
   return inside;
 }
+
+// Flat-earth metres around Lille: accurate to centimetres at this scale.
+const M_LAT = 111320, M_LNG = M_LAT * Math.cos((50.634 * Math.PI) / 180);
+
+// Closest point on the boundary to (lng, lat), and how far it is in metres.
+export function nearestEdge(lng, lat) {
+  let best = { d: Infinity, lng, lat };
+  for (let i = 0; i < VAUBAN_RING.length - 1; i++) {
+    const [x1, y1] = VAUBAN_RING[i], [x2, y2] = VAUBAN_RING[i + 1];
+    const ax = (x2 - x1) * M_LNG, ay = (y2 - y1) * M_LAT, px = (lng - x1) * M_LNG, py = (lat - y1) * M_LAT;
+    const t = Math.max(0, Math.min(1, (px * ax + py * ay) / (ax * ax + ay * ay || 1)));
+    const d = Math.hypot(px - t * ax, py - t * ay);
+    if (d < best.d) best = { d, lng: x1 + t * (x2 - x1), lat: y1 + t * (y2 - y1) };
+  }
+  return best;
+}
+
+// A GPS fix just outside the line is usually GPS error, not a person outside the district (JUNIA is ~40 m from
+// the edge, and indoor fixes are often off by 50-150 m). If the fix is within its own accuracy of the district
+// (capped), return a point a few metres inside the boundary to put the pin on; otherwise null.
+export const EDGE_MAX_M = 250;
+export function snapInside(lng, lat, accuracyM) {
+  if (inVauban(lng, lat)) return { lng, lat, snapped: false };
+  const e = nearestEdge(lng, lat);
+  if (e.d > Math.min(Math.max(accuracyM || 0, 50), EDGE_MAX_M)) return null;
+  // step inwards from the edge point, away from the fix, until we are clearly inside
+  const ux = (e.lng - lng) * M_LNG, uy = (e.lat - lat) * M_LAT, n = Math.hypot(ux, uy) || 1;
+  for (const step of [6, 12, 25, 40]) {
+    const p = { lng: e.lng + (ux / n) * step / M_LNG, lat: e.lat + (uy / n) * step / M_LAT };
+    if (inVauban(p.lng, p.lat)) return { ...p, snapped: true };
+  }
+  return null;
+}

@@ -26,6 +26,8 @@
       <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
       <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
       <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2Z"/><path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
       <symbol id="f-sad" viewBox="0 0 48 48"><circle cx="24" cy="24" r="19"/><path d="M16 34c3-4.5 13-4.5 16 0"/><circle fill="currentColor" stroke="none" cx="17" cy="22" r="2"/><circle fill="currentColor" stroke="none" cx="31" cy="22" r="2"/></symbol>
       <symbol id="f-vgood" viewBox="0 0 48 48"><circle cx="24" cy="24" r="19"/><path d="M14.5 28h19c0 6.5-4.2 10-9.5 10s-9.5-3.500-9.500-10z"/><circle fill="currentColor" stroke="none" cx="17" cy="20" r="2"/><circle fill="currentColor" stroke="none" cx="31" cy="20" r="2"/></symbol>
       <symbol id="f-calm" viewBox="0 0 48 48"><circle cx="24" cy="17" r="6"/><path d="M12 39c0-7.5 5.4-12 12-12s12 4.5 12 12"/></symbol>
@@ -49,16 +51,20 @@
         <button type="button" data-lang="fr" aria-pressed="true" lang="fr">FR</button>
         <button type="button" data-lang="en" aria-pressed="false" lang="en">EN</button>
       </div>
+      <button id="btn-chat" class="round" type="button" aria-pressed="false" aria-controls="chat" data-i18n-aria="btn.chat.label"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg></button>
       <button id="btn-settings" class="round" type="button" data-i18n-aria="btn.settings.label"><svg class="ic" aria-hidden="true"><use href="#i-gear"/></svg></button>
       <button id="btn-info" class="round" type="button" data-i18n-aria="btn.info.label"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg></button>
     </div>
   </header>
 
   <div id="maptools">
+    <div class="mt-row">
     <div class="seg topic" id="topic" role="group" data-i18n-aria="topic.label">
       <button type="button" data-topic="safety" aria-pressed="true" data-i18n="topic.safety">Sécurité</button>
       <button type="button" data-topic="crowd" aria-pressed="false" data-i18n="topic.crowd">Affluence</button>
       <button type="button" data-topic="obstacle" aria-pressed="false" data-i18n="topic.obstacle">Obstacles</button>
+    </div>
+    <button id="btn-3d" class="round" type="button" aria-pressed="false" data-i18n-aria="btn.3d.label"><svg class="ic" aria-hidden="true"><use href="#i-cube"/></svg></button>
     </div>
     <div id="legend" data-i18n-aria="legend.label">
       <span class="lg-dots"><span><i class="dot bad"></i><span id="lg-bad"></span></span>
@@ -340,9 +346,9 @@
   <div id="settings" class="modal" role="dialog" aria-modal="true" aria-labelledby="s-title" hidden>
     <div class="card scroll">
       <h2 id="s-title" data-i18n="settings.title">Réglages</h2>
-      <label class="switch-row" for="set-3d">
-        <span class="switch-tx"><b data-i18n="settings.exp.title">Vue 3D (expérimentale)</b><span data-i18n="settings.exp.desc"></span></span>
-        <input type="checkbox" id="set-3d" role="switch" class="switch">
+      <label class="switch-row" for="set-chat" id="set-chat-row">
+        <span class="switch-tx"><b data-i18n="settings.exp.title">Assistant (expérimental)</b><span data-i18n="settings.exp.desc"></span></span>
+        <input type="checkbox" id="set-chat" role="switch" class="switch">
       </label>
       <fieldset class="layers">
         <legend data-i18n="settings.layers">Couches de la carte</legend>
@@ -362,6 +368,23 @@
       <button id="s-close" class="btn primary wide" type="button" data-i18n="settings.close">Fermer</button>
     </div>
   </div>
+
+  <!-- ask the map: chat with the agent (hidden when VITE_AGENT_URL is not set) -->
+  <section id="chat" class="chat" hidden aria-labelledby="chat-title">
+    <div class="chat-card">
+      <div class="chat-head">
+        <h2 id="chat-title" data-i18n="chat.title">Demande à la carte</h2>
+        <button id="chat-close" class="chat-x" type="button" data-i18n-aria="chat.close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
+      </div>
+      <div id="chat-log" class="chat-log" role="log" aria-live="polite"></div>
+      <div id="chat-sugg" class="chat-sugg"></div>
+      <form id="chat-form" class="chat-form">
+        <input id="chat-in" type="text" maxlength="500" autocomplete="off" enterkeyhint="send" data-i18n-ph="chat.ph" data-i18n-aria="chat.ph">
+        <button class="chat-send" type="submit" data-i18n-aria="chat.send"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg></button>
+      </form>
+      <p class="chat-note" data-i18n="chat.note"></p>
+    </div>
+  </section>
 
   <div id="toast" role="status" aria-live="polite" hidden></div>
   <div id="detail" class="detail" hidden role="dialog"></div>

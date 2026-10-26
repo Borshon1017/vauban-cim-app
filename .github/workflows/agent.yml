@@ -1,0 +1,23 @@
+name: agent
+
+on:
+  push:
+    paths: ["agent/**", "public/data/**", "src/i18n.js", "src/vauban.js", "docs/MAP-DATA-AND-API.md", ".github/workflows/agent.yml"]
+  pull_request:
+    paths: ["agent/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - name: Unit, agent-loop and privacy tests (no API key, no network)
+        run: uv run pytest -q
+      - name: Docker image builds
+        working-directory: .
+        run: docker build -f agent/Dockerfile -t vauban-agent .

@@ -4,13 +4,17 @@ A phone-first web app where people mark places in the Vauban-Esquermes neighbour
 
 Reports go into a private PostGIS database. The public map never shows a single report, only 50 m squares where at least three different people said something. Researchers see the raw data, everyone else sees the grouped picture.
 
-The map itself is drawn with MapLibre on top of the city's own GIS data (buildings with heights, trees, street lamps, crossings, traffic lights, benches, bus stops), with an optional 3D view.
+The map itself is drawn with MapLibre on top of the city's own GIS data (buildings with heights, trees, street lamps, crossings, traffic lights, benches, bus stops), with a 3D view.
+
+There's also an experimental assistant you can switch on in Settings. You ask it things like "where do people feel unsafe? Is there a street lamp nearby?" and it answers from the same public data, then highlights the places on the map. It's an LLM agent built on the Mistral API, with tool calling over the map data and retrieval (RAG) over the project texts and approved comments. It passes all 18 questions of its evaluation suite, including attempts to pull private data out of it.
 
 ```
 phone ── HTTPS ──> Netlify (this app) ──> Supabase (PostgreSQL + PostGIS, anonymous sign-in)
+                         │
+                         └─ chat ──> agent (Python, FastAPI) ──> Mistral API
 ```
 
-Stack: vanilla JS + Vite, MapLibre GL, Supabase (Postgres, PostGIS, row-level security), Netlify.
+Stack: vanilla JS + Vite, MapLibre GL, Supabase (Postgres, PostGIS, row-level security), Netlify. Assistant: Python, FastAPI, Mistral API (`ministral-14b` with tool calling, `mistral-embed` for retrieval), numpy, pytest, Docker, GitHub Actions.
 
 ## How reporting works
 
@@ -70,6 +74,10 @@ For a quick one-off, `npm run build` and drag the `dist` folder onto app.netlify
 ### Before going live
 
 If you change the consent or privacy text, bump `CONSENT_VERSION` in `src/main.js` so everyone is asked again. The data controller, retention period and contact address in the privacy text (`info.p5` in `src/i18n.js`) should be confirmed with the project lead.
+
+## Ask the map
+
+Switch it on in Settings → Assistant (experimental). The chat answers questions about the neighbourhood from the same public data as the map and highlights the places it talks about. The agent lives in `agent/`: seven tools, an in-memory RAG index, privacy tests and an evaluation suite run against the real model. `agent/README.md` explains how it works. The app needs `VITE_AGENT_URL` to reach it.
 
 ## Map data
 
