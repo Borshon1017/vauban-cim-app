@@ -1,0 +1,28 @@
+{
+  "_help": "Edit ONLY the texts between the quotes, then run: npm run video   (about 2 minutes). Keep the commas and quotes. Each step has: title (big, left), sentence (big, right), line1 and line2 (small, right).",
+  "brand": "VAUBAN MAP",
+  "steps": [
+    { "title": "THE CITY, LIVE.", "sentence": "Every circle is people telling us how it feels.", "line1": "Red = bad", "line2": "Yellow = medium · Green = good" },
+    { "title": "TAP. READ. LEARN.", "sentence": "24 people. One dangerous spot.", "line1": "Main problem and feeling", "line2": "What people actually say" },
+    { "title": "THREE LENSES.", "sentence": "Safety. Crowd. Obstacles.", "line1": "One tap to switch", "line2": "Same map, different story" },
+    { "title": "OBSTACLES, LIVE.", "sentence": "Roadworks, potholes, bikes in the way.", "line1": "Reported as emoji", "line2": "Visible at street level" },
+    { "title": "NOW YOU CAN SEE EVERYTHING.", "sentence": "Traffic lights. Crossings. Lamps. Benches. Trees.", "line1": "Real city data, layer by layer", "line2": "Each one has its own switch" },
+    { "title": "BUILD IT IN 3D.", "sentence": "Buildings and trees at their real height.", "line1": "Slender lamps · one-line crossings", "line2": "Experimental view" },
+    { "title": "ASK THE MAP.", "sentence": "Ask a question. Get the answer, pinned on the map.", "line1": "Reads only public data", "line2": "Nothing stored" },
+    { "title": "REPORT IN 20 SECONDS.", "sentence": "Here now or remembered. Rate. Send.", "line1": "Fully anonymous", "line2": "No name, no e-mail" },
+    { "title": "EVERY SYMBOL, EXPLAINED.", "sentence": "One tap on the i button.", "line1": "Colours, emoji, lines, shapes", "line2": "Privacy information too" }
+  ],
+  "callouts": {
+    "trafficLight": "TRAFFIC LIGHT",
+    "crossing": "PEDESTRIAN CROSSING",
+    "lamp": "STREET LAMP",
+    "bench": "BENCH",
+    "tree": "TREE"
+  },
+  "endCard": {
+    "title": "VAUBAN MAP",
+    "line1": "Safety, crowd and obstacles, mapped by the people who live it",
+    "line2": "Open data · QGIS layers · Supabase"
+  },
+  "demoChatAnswer": "The **least safe place right now** is the bike lane near the campus.\n- **24 reports**, almost all \"unsafe\"\n- People say the lane stops with no warning\n\nSecond: the dark path near the park, with **18 reports** about lighting.\nI marked both spots on the map."
+}
