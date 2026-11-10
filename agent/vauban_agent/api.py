@@ -94,7 +94,7 @@ def create_app(settings: Settings | None = None, model=None, embedder=None, hots
     settings = settings or Settings()
     if model is None and settings.mistral_api_key:
         model = MistralClient(settings.mistral_api_key, settings.chat_model, settings.embed_model,
-                              min_interval_s=settings.min_interval_s)
+                              min_interval_s=settings.min_interval_s, fallbacks=settings.fallback_models)
         embedder = embedder or model
     ctx = build_context(settings, embedder, hotspots)
     limiter = RateLimiter(settings.rate_per_minute, settings.rate_per_day, settings.daily_budget)

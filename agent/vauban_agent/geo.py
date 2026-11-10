@@ -23,6 +23,10 @@ def centre(geometry: dict) -> tuple[float, float]:
         pts = c[0][:-1] or c[0]
     elif kind == "MultiPolygon":
         pts = c[0][0][:-1] or c[0][0]
+    elif kind == "MultiLineString":          # zebra-stripe crossings: the mean of all stripe points = the crossing's centre
+        pts = [p for line in c for p in line]
+    elif kind == "MultiPoint":
+        pts = c
     else:
         raise ValueError(f"unsupported geometry {kind}")
     return sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)

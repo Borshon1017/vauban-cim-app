@@ -1,7 +1,7 @@
 // Vauban data pipeline: QGIS shapefiles (../Vauban_Webdata/, outside the repo) -> small web files (public/data/*.geojson).
 // Run it again whenever the shapefiles change:   npm run data
 // What it does: reproject to WGS84, keep only what lies inside the Vauban-Esquermes boundary, keep the few
-// attributes the map needs, simplify the tree crowns, and draw each pedestrian crossing as ONE clean line across the road.
+// attributes the map needs, simplify the tree crowns, and draw each pedestrian crossing as a row of zebra stripes across the road.
 import * as shapefile from 'shapefile';
 import proj4 from 'proj4';
 import fs from 'node:fs';
@@ -116,7 +116,7 @@ await points('Disabled Parking_Vauban', 'parking', 'L93', (p) => ({ n: p.nbr_pla
   write('bus', fc(out));
 }
 
-/* ---------------- crossings: ONE line per crossing, perpendicular to the road ---------------- */
+/* ---------------- crossings: a row of stripes (like IIIII) across the road ---------------- */
 {
   const lat0 = 50.635, lon0 = 3.04, mx = 111320 * KX, my = 110574;
   const toM = (c) => [(c[0] - lon0) * mx, (c[1] - lat0) * my];
@@ -145,9 +145,18 @@ await points('Disabled Parking_Vauban', 'parking', 'L93', (p) => ({ n: p.nbr_pla
     const kind = f.properties.crossing || 'marked'; if (kind === 'unmarked') { unmarked++; continue; }
     const p = toM(c), n = nearest(p, true);
     if (!n || n.d > 12) { skipped++; continue; }                                  // no street close enough to know which way it runs
-    const L = Math.hypot(n.vx, n.vy) || 1, ux = -n.vy / L, uy = n.vx / L;         // unit vector perpendicular to the road
-    const half = Math.min(8, Math.max(2, n.s.w / 2));
-    out.push(feature({ type: 'LineString', coordinates: [toLL([p[0] - ux * half, p[1] - uy * half]), toLL([p[0] + ux * half, p[1] + uy * half])] }, { k: kind === 'traffic_signals' ? 's' : kind === 'uncontrolled' ? 'u' : 'm' }));
+    const L = Math.hypot(n.vx, n.vy) || 1;
+    const rx = n.vx / L, ry = n.vy / L;                                           // unit vector ALONG the road
+    const ux = -ry, uy = rx;                                                      // unit vector ACROSS the road
+    const half = Math.min(8, Math.max(2, n.s.w / 2));                             // half of the crossing width (across the road)
+    // a zebra crossing is a row of stripes: each stripe runs along the road (3 m), the stripes are spread across the road every 1.4 m
+    const count = Math.max(3, Math.floor((2 * half - 0.7) / 1.4) + 1), step = count > 1 ? (2 * half - 0.7) / (count - 1) : 0;
+    const stripes = [];
+    for (let i = 0; i < count; i++) {
+      const t = -half + 0.35 + i * step, cx = p[0] + ux * t, cy = p[1] + uy * t;
+      stripes.push([toLL([cx - rx * 1.5, cy - ry * 1.5]), toLL([cx + rx * 1.5, cy + ry * 1.5])]);
+    }
+    out.push(feature({ type: 'MultiLineString', coordinates: stripes }, { k: kind === 'traffic_signals' ? 's' : kind === 'uncontrolled' ? 'u' : 'm' }));
   }
   stats.crossings = { skippedNoRoad: skipped, unmarked }; write('crossings', fc(out));
 }

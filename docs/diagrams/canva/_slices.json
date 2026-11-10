@@ -1,0 +1,44 @@
+{
+ "slide-architecture-app": {
+  "left": 36,
+  "top": 372,
+  "width": 700,
+  "height": 690
+ },
+ "slide-architecture-row1": {
+  "left": 736,
+  "top": 372,
+  "width": 1148,
+  "height": 225
+ },
+ "slide-architecture-row2": {
+  "left": 736,
+  "top": 597,
+  "width": 1148,
+  "height": 240
+ },
+ "slide-architecture-row3": {
+  "left": 736,
+  "top": 837,
+  "width": 1148,
+  "height": 225
+ },
+ "slide-dataflow-lane1": {
+  "left": 36,
+  "top": 372,
+  "width": 1848,
+  "height": 242
+ },
+ "slide-dataflow-lane2": {
+  "left": 36,
+  "top": 614,
+  "width": 1848,
+  "height": 196
+ },
+ "slide-dataflow-lane3": {
+  "left": 36,
+  "top": 810,
+  "width": 1848,
+  "height": 262
+ }
+}

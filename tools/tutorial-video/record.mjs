@@ -30,7 +30,7 @@ fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(FRAMES, { recursi
 /* ------------------------------------------------------------------ real objects near the street spot */
 const rd = (n) => JSON.parse(fs.readFileSync(path.join(ROOT, 'public', 'data', n + '.geojson'), 'utf8')).features;
 const dist = (a, b) => Math.hypot((a[0] - b[0]) * 71000, (a[1] - b[1]) * 111000);
-const anyPt = (f) => { const g = f.geometry; if (g.type === 'Point') return g.coordinates; if (g.type === 'LineString') return [(g.coordinates[0][0] + g.coordinates[1][0]) / 2, (g.coordinates[0][1] + g.coordinates[1][1]) / 2]; return [f.properties.cx, f.properties.cy]; };
+const anyPt = (f) => { const g = f.geometry; if (g.type === 'Point') return g.coordinates; if (g.type === 'LineString') return [(g.coordinates[0][0] + g.coordinates[1][0]) / 2, (g.coordinates[0][1] + g.coordinates[1][1]) / 2]; if (g.type === 'MultiLineString') { const m = g.coordinates[Math.floor(g.coordinates.length / 2)]; return [(m[0][0] + m[1][0]) / 2, (m[0][1] + m[1][1]) / 2]; } return [f.properties.cx, f.properties.cy]; };
 const D = Object.fromEntries(['signals', 'lamps', 'benches', 'crossings', 'trees'].map((n) => [n, rd(n)]));
 const SPOT = D.signals.map((s) => { const p = s.geometry.coordinates; const n = (arr) => arr.filter((f) => dist(p, anyPt(f)) < 45).length;
   return { p, score: Math.min(n(D.lamps), 3) + Math.min(n(D.benches), 2) + Math.min(n(D.crossings), 3) + Math.min(n(D.trees), 3) / 2 }; }).sort((a, b) => b.score - a.score)[0].p;

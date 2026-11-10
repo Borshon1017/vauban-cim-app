@@ -24,9 +24,25 @@ const FC = (features) => ({ type: 'FeatureCollection', features });
 export const TUNING = {                              // sizes in metres: change here to restyle the 3D view
   lampPole: 0.12, lampHead: 0.38, lampHeadHeight: 0.45,
   signalPole: 0.1, signalHead: 0.3, signalHeadHeight: 0.9,
-  trunk: 0.3, crownBase: 0.4,                        // the crown starts at 40 % of the tree height
+  trunk: 0.3, crownBase: 0.5,                        // the crown starts at 50 % of the tree height
+  crownScale: 0.5, crownMaxR: 6,                     // the measured crowns are very wide (median 7.6 m radius, some 80 m): draw them at 50 %, never wider than 6 m, so streets stay readable
   bench: 0.8
 };
+
+// the crown polygons in the data are the full measured canopy (often 15-30 m wide). Drawn like that they cover whole streets,
+// so each one is shrunk towards its own centre (cx, cy): scaled by crownScale and capped at crownMaxR metres of radius
+function shrinkCrowns(fc) {
+  if (!fc) return fc;
+  const M = 111320;
+  return FC(fc.features.map((f) => {
+    if (f.geometry.type !== 'Polygon') return f;
+    const { cx, cy } = f.properties, k = Math.cos((cy * Math.PI) / 180);
+    const ring = f.geometry.coordinates[0];
+    const r = Math.max(...ring.map(([x, y]) => Math.hypot((x - cx) * M * k, (y - cy) * M)));
+    const m = r > 0 ? Math.min(TUNING.crownScale, TUNING.crownMaxR / r) : 1;
+    return { ...f, geometry: { type: 'Polygon', coordinates: [ring.map(([x, y]) => [cx + (x - cx) * m, cy + (y - cy) * m])] } };
+  }));
+}
 
 function lamps3d(fc) {
   const out = [];
@@ -76,31 +92,41 @@ async function load(name) {
 // ---- add everything to the map. Returns controls for the Settings screen.
 export async function addVaubanLayers(map, dark = false) {
   const C = dark
-    ? { bldg: '#3a4452', bldgLine: '#566274', bldg3d: '#4d586a', tree: '#3f8a5a', tree3d: '#3f8a5a', casing: '#10161d', cross: '#f1f5f9', crossSig: '#6fb4ff', crossUnc: '#9aa7b4', pole: '#8b96a3' }
-    : { bldg: '#d3dae2', bldgLine: '#aab5c2', bldg3d: '#dfe4ea', tree: '#6fb37a', tree3d: '#5aa46b', casing: '#ffffff', cross: '#0e1b2a', crossSig: '#0b6bcb', crossUnc: '#5b6773', pole: '#4b5560' };
+    ? { bldg: '#3a4452', bldgLine: '#566274', bldg3d: '#4d586a', tree: '#3f8a5a', tree3d: '#3f8a5a', casing: '#10161d', mk1: '#f5f7fa', mk2: '#6f7b8a', red: '#ff6b6b', yellow: '#ffd23f', green: '#4ade80', orange: '#ffa63d', pole: '#8b96a3' }
+    : { bldg: '#d3dae2', bldgLine: '#aab5c2', bldg3d: '#dfe4ea', tree: '#6fb37a', tree3d: '#5aa46b', casing: '#ffffff', mk1: '#111418', mk2: '#9aa3ad', red: '#d62828', yellow: '#f2b705', green: '#1e9e48', orange: '#f07b00', pole: '#4b5560' };
   const data = Object.fromEntries(await Promise.all(['buildings', 'trees', 'lamps', 'signals', 'benches', 'crossings', 'parking', 'bus'].map(async (n) => [n, await load(n)])));
+  // a crossing is a MultiLineString of stripes: one line per stripe, numbered along the crossing, so the stripes can take turns in colour
+  data.trees = shrinkCrowns(data.trees);
+  if (data.crossings) data.crossings = FC(data.crossings.features.flatMap((f) => f.geometry.coordinates.map((c, i) => ({
+    type: 'Feature', properties: { k: f.properties.k, i }, geometry: { type: 'LineString', coordinates: c } }))));
   const src = (id, d) => { if (d) map.addSource(id, { type: 'geojson', data: d, attribution: ATTRIBUTION }); return Boolean(d); };
   const add = (layer) => map.addLayer(layer, BEFORE);
 
   // the base style draws its own (relief) buildings: hide them, ours come from the BD TOPO data
   if (src('buildings', data.buildings)) {
-    ['building', 'building-3d'].forEach((id) => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'none'); });   // only hidden once ours are there
+    if (map.getLayer('building-3d')) map.setLayoutProperty('building-3d', 'visibility', 'none');   // the base map's own relief buildings never show: the 3D view is only for Vauban (outside stays flat)
     add({ id: 'bldg-flat', type: 'fill', source: 'buildings', paint: { 'fill-color': C.bldg, 'fill-outline-color': C.bldgLine } });
     add({ id: 'bldg-3d', type: 'fill-extrusion', source: 'buildings', layout: { visibility: 'none' },
       paint: { 'fill-extrusion-color': C.bldg3d, 'fill-extrusion-height': ['get', 'h'], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.94, 'fill-extrusion-vertical-gradient': true } });
   }
   if (src('trees', data.trees)) {
     src('trunks', trunks3d(data.trees));
-    add({ id: 'trees-flat', type: 'fill', source: 'trees', minzoom: 15, paint: { 'fill-color': C.tree, 'fill-opacity': dark ? 0.6 : 0.5 } });
+    // flat tree crowns go UNDER the base map's roads (the first tunnel_/road_/bridge_ layer), so a crown never hides a street, a name or a crossing
+    const underRoads = (map.getStyle().layers.find((l) => /^(tunnel_|road_|bridge_)/.test(l.id)) || {}).id || BEFORE;
+    map.addLayer({ id: 'trees-flat', type: 'fill', source: 'trees', minzoom: 15, paint: { 'fill-color': C.tree, 'fill-opacity': dark ? 0.7 : 0.62 } }, underRoads);
     add({ id: 'trees-3d', type: 'fill-extrusion', source: 'trees', minzoom: 15, layout: { visibility: 'none' },
       paint: { 'fill-extrusion-color': C.tree3d, 'fill-extrusion-height': ['get', 'z'], 'fill-extrusion-base': ['*', ['get', 'z'], TUNING.crownBase], 'fill-extrusion-opacity': 0.92 } });
     add({ id: 'trunks-3d', type: 'fill-extrusion', source: 'trunks', minzoom: 16, layout: { visibility: 'none' },
       paint: { 'fill-extrusion-color': '#7a5a3c', 'fill-extrusion-height': ['get', 't'], 'fill-extrusion-base': 0 } });
   }
-  if (src('crossings', data.crossings)) {                                   // one clean line per crossing, street level only
-    add({ id: 'cross-casing', type: 'line', source: 'crossings', minzoom: 17, layout: { 'line-cap': 'butt' }, paint: { 'line-color': C.casing, 'line-width': ['interpolate', ['linear'], ['zoom'], 17, 4, 20, 9], 'line-opacity': 0.9 } });
+  if (src('crossings', data.crossings)) {                                   // zebra crossings: a row of stripes (IIIII), street level only
+    const w = (a, b) => ['interpolate', ['exponential', 2], ['zoom'], 17, a, 20, b];   // widths double with every zoom level, so the stripes keep their real size
+    add({ id: 'cross-casing', type: 'line', source: 'crossings', minzoom: 17, layout: { 'line-cap': 'butt' }, paint: { 'line-color': C.casing, 'line-width': w(3.6, 28.8), 'line-opacity': 0.9 } });
     add({ id: 'cross-line', type: 'line', source: 'crossings', minzoom: 17, layout: { 'line-cap': 'butt' },
-      paint: { 'line-color': ['match', ['get', 'k'], 's', C.crossSig, 'u', C.crossUnc, C.cross], 'line-width': ['interpolate', ['linear'], ['zoom'], 17, 2, 20, 5], 'line-opacity': 1 } });
+      paint: { 'line-color': ['match', ['get', 'k'],
+        's', ['match', ['%', ['get', 'i'], 3], 0, C.red, 1, C.yellow, C.green],          // with traffic lights: red, yellow, green, red, ...
+        'u', C.orange,                                                                   // without traffic lights: orange
+        ['match', ['%', ['get', 'i'], 2], 0, C.mk1, C.mk2]], 'line-width': w(2.2, 17.6), 'line-opacity': 1 } });
   }
   Object.entries(ICONS).forEach(([k, [emoji, color]]) => { if (!map.hasImage('ic-' + k)) map.addImage('ic-' + k, badge(emoji, color, dark), { pixelRatio: 2 }); });
   const icons = (id, d, minzoom) => { if (src(id, d)) add({ id: id + '-dot', type: 'symbol', source: id, minzoom,

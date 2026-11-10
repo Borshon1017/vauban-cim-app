@@ -19,6 +19,9 @@ class Settings:
     mistral_api_key: str = field(default_factory=lambda: os.getenv("MISTRAL_API_KEY", ""))
     chat_model: str = field(default_factory=lambda: os.getenv("MISTRAL_MODEL", "ministral-14b-2512"))
     embed_model: str = field(default_factory=lambda: os.getenv("MISTRAL_EMBED_MODEL", "mistral-embed"))
+    # the free plan limits EACH model to 2 requests a minute; when one is full we try the next (comma separated, empty = off)
+    fallback_models: tuple[str, ...] = field(default_factory=lambda: tuple(
+        m.strip() for m in os.getenv("MISTRAL_FALLBACK_MODELS", "ministral-8b-latest,open-mistral-nemo").split(",") if m.strip()))
     # the same public values the web app uses: the agent only ever sees what the public map shows
     supabase_url: str = field(default_factory=lambda: os.getenv("SUPABASE_URL", ""))
     supabase_anon_key: str = field(default_factory=lambda: os.getenv("SUPABASE_ANON_KEY", ""))

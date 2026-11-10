@@ -11,7 +11,7 @@ import { initChat } from './chat.js';
 const URL = import.meta.env.VITE_SUPABASE_URL;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const CONSENT_VERSION = 'v3';                     // bump when the consent / privacy text changes
-const PAD = 0.003;                                // the map can be moved a little beyond the district (about 300 m)
+const CAMPUS = [3.045, 50.6335];                  // a point inside Vauban: where the map goes if you start a report while looking elsewhere
 const FAR_FROM_FIX_M = 100;                       // pin further than this from the GPS fix = "remembered" report
 const LOW_ACC_M = 100;                            // GPS fix less precise than this: ask the user to place the pin themselves
 const TOD_START = { morning: 5, afternoon: 12, evening: 18, night: 22 };   // must match supabase/01_schema.sql
@@ -167,18 +167,40 @@ const map = new maplibregl.Map({
   style: `https://tiles.openfreemap.org/styles/${DARK ? 'dark' : 'liberty'}`,
   bounds: [[BBOX.w, BBOX.s], [BBOX.e, BBOX.n]],              // opens on the whole district
   fitBoundsOptions: { padding: { top: 130, bottom: 110, left: 14, right: 14 } },
-  maxBounds: [[BBOX.w - PAD, BBOX.s - PAD], [BBOX.e + PAD, BBOX.n + PAD]],
-  minZoom: 12,
-  maxPitch: 0, pitchWithRotate: false, dragRotate: false, touchPitch: false,   // flat 2D: no tilting, no rotating
+  maxBounds: [[3.0, 50.585], [3.095, 50.68]],                // you can look around Lille; only Vauban is active (the rest is grayed out)
+  minZoom: 11,
+  maxPitch: 0, pitchWithRotate: false, touchPitch: false,   // flat 2D: no tilting. Turning the map (drag with the right mouse button / Ctrl, two-finger twist, buttons) is always allowed
   attributionControl: { compact: true }
 });
-map.touchZoomRotate.disableRotation();
 if (import.meta.env.DEV) window.__map = map;                  // handy in the browser console while developing (not in the live site)
 map.addControl(new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }), 'bottom-right');
+
+// Compass with two rotate buttons. The red end of the needle always points north.
+// Tap the compass to turn the map back to north (the 3D tilt stays). The arrows turn the map by 45 degrees.
+const ROT_STEP = 45;
+class CompassControl {
+  onAdd(m) {
+    this.map = m;
+    this.el = document.createElement('div'); this.el.className = 'maplibregl-ctrl maplibregl-ctrl-group compass-group';
+    const arrow = (flip) => `<svg viewBox="0 0 24 24" aria-hidden="true" style="${flip ? 'transform:scaleX(-1)' : ''}"><path d="M20 12a8 8 0 1 1-2.6-5.9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M20.5 3.5v4.6h-4.6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const mk = (cls, html, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.innerHTML = html; b.onclick = fn; this.el.appendChild(b); return b; };
+    this.left = mk('ctrl-rot ctrl-rot-left', arrow(true), () => m.easeTo({ bearing: m.getBearing() + ROT_STEP, duration: 350 }));       // map turns counter-clockwise
+    this.btn = mk('ctrl-compass', '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".35"/>'
+      + '<g class="needle"><path d="M20 5 L25.5 20 L14.5 20 Z" fill="#e5484d"/><path d="M20 35 L25.5 20 L14.5 20 Z" fill="currentColor" opacity=".45"/></g>'
+      + '<circle cx="20" cy="20" r="2" fill="#fff" stroke="currentColor" stroke-width="1"/></svg>', () => m.easeTo({ bearing: 0, duration: 500 }));
+    this.right = mk('ctrl-rot ctrl-rot-right', arrow(false), () => m.easeTo({ bearing: m.getBearing() - ROT_STEP, duration: 350 }));    // map turns clockwise
+    this.needle = this.btn.querySelector('.needle');
+    this.sync = () => this.needle.setAttribute('transform', `rotate(${-m.getBearing()} 20 20)`);
+    m.on('rotate', this.sync); m.on('load', this.sync); this.sync();
+    return this.el;
+  }
+  onRemove() { this.map.off('rotate', this.sync); this.el.remove(); }
+}
+map.addControl(new CompassControl(), 'bottom-right');
 function setCtrlLabels() {
   const set = (sel, key) => { const el = document.querySelector(sel); if (el) { el.setAttribute('aria-label', t(key)); el.title = t(key); } };
   set('.maplibregl-ctrl-zoom-in', 'zoom.in'); set('.maplibregl-ctrl-zoom-out', 'zoom.out');
-  set('.maplibregl-ctrl-compass', 'compass'); set('.maplibregl-ctrl-attrib-button', 'attrib.toggle');
+  set('.ctrl-compass', 'compass'); set('.ctrl-rot-left', 'rotate.left'); set('.ctrl-rot-right', 'rotate.right'); set('.maplibregl-ctrl-attrib-button', 'attrib.toggle');
   map.getCanvas().setAttribute('aria-label', t('map.label'));
 }
 
@@ -187,13 +209,13 @@ const maskColor = () => getComputedStyle(document.documentElement).getPropertyVa
 function refreshMask() { if (map.getLayer('outside-mask')) map.setPaintProperty('outside-mask', 'fill-color', maskColor()); }
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', refreshMask);
 map.on('load', () => {
-  if (map.getLayer('building-3d')) map.setLayoutProperty('building-3d', 'visibility', 'none');   // the base style draws buildings in relief: keep it flat unless the experimental view is on
+  if (map.getLayer('building-3d')) map.setLayoutProperty('building-3d', 'visibility', 'none');   // the base style draws buildings in relief: never (3D is only for Vauban)
   setCtrlLabels();
   // everything outside the district is covered, so only Vauban is visible
   map.addSource('area', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [VAUBAN_RING] } } });
   map.addSource('outside', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Polygon',
     coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]], VAUBAN_RING] } } });
-  map.addLayer({ id: 'outside-mask', type: 'fill', source: 'outside', paint: { 'fill-color': maskColor(), 'fill-opacity': 1 } });
+  map.addLayer({ id: 'outside-mask', type: 'fill', source: 'outside', paint: { 'fill-color': maskColor(), 'fill-opacity': DARK ? 0.55 : 0.66 } });   // everything outside Vauban stays visible but grayed out
   map.addLayer({ id: 'area-line', type: 'line', source: 'area',
     paint: { 'line-color': DARK ? '#ffffff' : '#3d4a8a', 'line-width': 2, 'line-opacity': 0.55 } });
 
@@ -338,9 +360,7 @@ function set3d(on) {
   view3d = on; $('btn-3d').setAttribute('aria-pressed', String(on));
   applyLayers();
   map.setMaxPitch(on ? 70 : 0);
-  const act = on ? 'enable' : 'disable';
-  map.dragRotate[act](); map.touchPitch[act]();
-  if (on) map.touchZoomRotate.enableRotation(); else map.touchZoomRotate.disableRotation();
+  map.touchPitch[on ? 'enable' : 'disable']();                         // tilting only in the 3D view; turning is always on
   map.easeTo({ pitch: on ? 60 : 0, bearing: on ? -20 : 0, zoom: on ? Math.max(map.getZoom(), 17) : map.getZoom(), duration: 700 });
 }
 
@@ -419,6 +439,7 @@ function metres(a, b) {
 
 function setPhase(p) {
   phase = p; phaseAt = performance.now();
+  outsidePin = false; savedHelp = null; $('crosshair').classList.remove('outside');
   document.body.dataset.phase = p;
   $('btn-report').hidden = p !== 'idle';
   $('modebar').hidden = p !== 'mode';
@@ -437,7 +458,19 @@ function setPhase(p) {
 }
 function setPickHelp(key, vars = null) { pickHelp = { key, vars }; renderPickHelp(); }
 function renderPickHelp() { $('pick-help').textContent = t(pickHelp.key, pickHelp.vars); }
-function syncNext() { $('btn-pick-ok').disabled = locating; }
+let outsidePin = false, savedHelp = null;
+function syncNext() { $('btn-pick-ok').disabled = locating || outsidePin; }
+// while the pin is placed: if it is outside Vauban, say so at once, gray the pin and block "Next" (the database refuses it too)
+function checkPin() {
+  if (phase !== 'pick') return;
+  const c = map.getCenter(), out = !inVauban(c.lng, c.lat);
+  if (out === outsidePin) return;
+  outsidePin = out; $('crosshair').classList.toggle('outside', out);
+  if (out) { if (!/outside/.test(pickHelp.key)) { savedHelp = { ...pickHelp }; setPickHelp('pick.outside'); } }
+  else if (savedHelp) { setPickHelp(savedHelp.key, savedHelp.vars); savedHelp = null; }
+  syncNext();
+}
+map.on('move', checkPin);
 
 $('btn-report').onclick = () => {
   if (!configured) return;
@@ -454,6 +487,7 @@ $('btn-gps').onclick = () => locate();
 function startPick(mode) {
   reportMode = mode; setPhase('pick');
   if (view3d) set3d(false);
+  if (mode === 'later') { const c = map.getCenter(); if (!inVauban(c.lng, c.lat)) map.easeTo({ center: CAMPUS, zoom: Math.max(map.getZoom(), 16), duration: 600 }); }   // looking elsewhere: bring the map back to Vauban
   $('btn-gps').hidden = mode !== 'now';
   if (mode === 'now') locate(); else { locateSeq++; locating = false; syncNext(); setPickHelp('pick.later'); }
 }
@@ -477,7 +511,11 @@ function locate() {
       if (p.snapped) setPickHelp('pick.now.edge');
       else setPickHelp(acc > LOW_ACC_M ? 'pick.now.lowacc' : 'pick.now.found', { m: Math.round(acc) });
     },
-    () => { if (stale()) return; locating = false; syncNext(); fixState = 'fail'; setPickHelp('pick.now.fail'); },
+    (err) => {
+      if (stale()) return;
+      locating = false; syncNext(); fixState = 'fail';
+      setPickHelp(err && err.code === 1 ? 'pick.now.denied' : 'pick.now.fail');   // code 1 = the browser/OS blocks location for this site
+    },
     { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
   );
 }

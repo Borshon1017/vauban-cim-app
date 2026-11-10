@@ -32,11 +32,12 @@ export const T = {
     'pick.now.finding': 'Recherche de ta position…',
     'pick.now.found': 'Repère placé sur ta position (±{m} m). Ajuste-le si besoin.',
     'pick.now.fail': "Impossible d’obtenir ta position. Réessaie, ou choisis « Je me souviens d’un endroit ».",
+    'pick.now.denied': "La position est bloquée pour ce site. Autorise-la (🔒 dans la barre d’adresse → Position), ou choisis « Je me souviens d’un endroit » et place le repère toi-même.",
     'pick.now.unsupported': "La localisation n’est pas disponible sur cet appareil. Choisis « Je me souviens d’un endroit ».",
     'pick.now.outside': "Tu sembles être hors du quartier Vauban. Choisis « Je me souviens d’un endroit » pour indiquer le lieu.",
     'pick.now.edge': "Tu es tout près de la limite du quartier. Vérifie que le repère est au bon endroit, à l’intérieur de la ligne pointillée.",
     'pick.now.far': "Le repère est loin de ta position. Passage en mode « Je me souviens d’un endroit » : on te demandera quand c’était.",
-    'pick.outside': "Ce lieu est hors du quartier Vauban (ligne pointillée). Place le repère à l’intérieur.",
+    'pick.outside': "Ce lieu est hors du quartier Vauban (la zone entourée). Place le repère à l’intérieur.",
     'pick.retry': "Réessayer",
     'pick.switch': 'Changer de mode',
     'pick.next': 'Suivant',
@@ -279,7 +280,9 @@ export const T = {
     'legend.cross.u': "Passage piéton sans feux",
     'legend.bldg': "Bâtiment (en 3D : sa hauteur réelle)",
     'legend.tree': "Arbre (en 3D : sa hauteur maximale)",
-    'legend.area': "Limite du quartier Vauban"
+    'legend.area': "Limite du quartier Vauban",
+    'rotate.left': "Tourner la carte à gauche",
+    'rotate.right': "Tourner la carte à droite"
   },
 
   en: {
@@ -311,11 +314,12 @@ export const T = {
     'pick.now.finding': 'Finding your location…',
     'pick.now.found': 'Pin placed at your location (±{m} m). Adjust it if needed.',
     'pick.now.fail': "Could not get your location. Try again, or choose “I remember a place”.",
+    'pick.now.denied': "Location is blocked for this site. Allow it (🔒 in the address bar → Location), or choose “I remember a place” and put the pin yourself.",
     'pick.now.unsupported': "Location is not available on this device. Choose “I remember a place”.",
     'pick.now.outside': 'You seem to be outside the Vauban district. Choose “I remember a place” to mark the spot.',
     'pick.now.edge': "You are right at the edge of the district. Check the pin is in the right place, inside the dashed line.",
     'pick.now.far': 'The pin is far from your location. Switching to “I remember a place”: we will ask when it happened.',
-    'pick.outside': "That place is outside the Vauban district (dashed line). Move the pin inside it.",
+    'pick.outside': "That place is outside the Vauban district (the outlined area). Move the pin inside it.",
     'pick.retry': "Try again",
     'pick.switch': 'Change mode',
     'pick.next': 'Next',
@@ -558,7 +562,9 @@ export const T = {
     'legend.cross.u': "Crossing without traffic lights",
     'legend.bldg': "Building (in 3D: its real height)",
     'legend.tree': "Tree (in 3D: its maximum height)",
-    'legend.area': "Boundary of the Vauban district"
+    'legend.area': "Boundary of the Vauban district",
+    'rotate.left': "Rotate the map left",
+    'rotate.right': "Rotate the map right"
   }
 };
 

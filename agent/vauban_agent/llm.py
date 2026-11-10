@@ -11,34 +11,48 @@ class LLMError(RuntimeError):
     pass
 
 
+class RateLimited(LLMError):
+    """Mistral answered 429 (this model has used up its requests for the minute)."""
+
+
 class MistralClient:
-    def __init__(self, api_key: str, chat_model: str, embed_model: str, timeout: float = 45, min_interval_s: float = 0):
+    def __init__(self, api_key: str, chat_model: str, embed_model: str, timeout: float = 45, min_interval_s: float = 0,
+                 fallbacks: tuple[str, ...] = ()):
         self.chat_model, self.embed_model = chat_model, embed_model
+        self.fallbacks = tuple(fallbacks)
         self._http = httpx.Client(base_url=API, timeout=timeout, headers={"Authorization": f"Bearer {api_key}"})
         # the free plan allows about one request every 2 s on some models: space calls out instead of hitting 429s
         self._min_interval, self._last = min_interval_s, 0.0
 
-    def _post(self, path: str, body: dict) -> dict:
+    def _post(self, path: str, body: dict, fail_fast: bool = False) -> dict:
         for attempt in range(4):
             wait = self._min_interval - (time.monotonic() - self._last)
             if wait > 0:
                 time.sleep(wait)
             self._last = time.monotonic()
             r = self._http.post(path, json=body)
+            if r.status_code == 429 and fail_fast:               # let the caller try another model right away
+                raise RateLimited("rate limited")
             if r.status_code == 429 or r.status_code >= 500:   # rate limited or hiccup: back off and retry
-                time.sleep(2.0 * (attempt + 1))
+                time.sleep(2.0 * (attempt + 1) if r.status_code != 429 else 8.0 * (attempt + 1))
                 continue
             if r.status_code >= 400:
                 raise LLMError(f"Mistral {r.status_code}: {r.text[:300]}")
             return r.json()
-        raise LLMError(f"Mistral unavailable ({r.status_code})")
+        raise LLMError(f"Mistral unavailable ({r.status_code}): {r.text[:300]}")
 
     def chat(self, messages: list[dict], tools: list[dict] | None = None, tool_choice: str = "auto") -> dict:
         """Returns the assistant message: {"role", "content", "tool_calls"?}."""
-        body = {"model": self.chat_model, "messages": messages, "temperature": 0.2}
+        body = {"messages": messages, "temperature": 0.2}
         if tools:
             body["tools"], body["tool_choice"] = tools, tool_choice
-        return self._post("/chat/completions", body)["choices"][0]["message"]
+        models = [self.chat_model, *self.fallbacks]
+        for i, model in enumerate(models):
+            body["model"] = model
+            try:      # every model but the last fails fast on 429, so a full model just hands over to the next one
+                return self._post("/chat/completions", body, fail_fast=i < len(models) - 1)["choices"][0]["message"]
+            except RateLimited:
+                continue
 
     def embed(self, texts: list[str]) -> np.ndarray:
         out = []
