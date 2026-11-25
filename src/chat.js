@@ -51,7 +51,7 @@ export function initChat({ map, t, getLang, $, dark }) {
     const wide = window.matchMedia('(min-width:800px)').matches;
     const pad = wide ? { top: 120, bottom: 80, left: 60, right: panel.offsetWidth + 60 }
                      : { top: 110, bottom: panel.offsetHeight + 40, left: 40, right: 40 };
-    map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: pad, maxZoom: 17, duration: 600 });
+    map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: pad, maxZoom: Math.min(17, map.getMaxZoom()), duration: 600 });
   }
 
   /* ---------- rendering ---------- */

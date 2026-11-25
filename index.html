@@ -26,6 +26,7 @@
       <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
       <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
       <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
       <symbol id="i-chat" viewBox="0 0 24 24"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2Z"/><path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01"/></symbol>
       <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
       <symbol id="f-sad" viewBox="0 0 48 48"><circle cx="24" cy="24" r="19"/><path d="M16 34c3-4.5 13-4.5 16 0"/><circle fill="currentColor" stroke="none" cx="17" cy="22" r="2"/><circle fill="currentColor" stroke="none" cx="31" cy="22" r="2"/></symbol>
@@ -58,6 +59,13 @@
   </header>
 
   <div id="maptools">
+    <div id="search" role="search">
+      <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+      <input id="search-input" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="search-list" data-i18n-ph="search.ph" data-i18n-aria="search.label">
+      <button id="search-clear" class="search-x" type="button" hidden data-i18n-aria="search.clear"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
+      <ul id="search-list" role="listbox" hidden data-i18n-aria="search.results"></ul>
+      <p id="search-note" role="status" hidden></p>
+    </div>
     <div class="mt-row">
     <div class="seg topic" id="topic" role="group" data-i18n-aria="topic.label">
       <button type="button" data-topic="safety" aria-pressed="true" data-i18n="topic.safety">Sécurité</button>

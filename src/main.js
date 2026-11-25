@@ -6,6 +6,7 @@ import { T, DEFAULT_LANG, CATEGORY_FALLBACK } from './i18n.js';
 import { VAUBAN_RING, BBOX, inVauban, snapInside } from './vauban.js';
 import { addVaubanLayers, LAYER_KEYS, LAYER_DEFAULTS } from './layers.js';
 import { initChat } from './chat.js';
+import { initSearch } from './search.js';
 
 /* ---------- config ---------- */
 const URL = import.meta.env.VITE_SUPABASE_URL;
@@ -16,6 +17,8 @@ const FAR_FROM_FIX_M = 100;                       // pin further than this from 
 const LOW_ACC_M = 100;                            // GPS fix less precise than this: ask the user to place the pin themselves
 const TOD_START = { morning: 5, afternoon: 12, evening: 18, night: 22 };   // must match supabase/01_schema.sql
 const MAX_PAST_DAYS = 365;                        // must match private.settings max_past_days
+const MAX_ZOOM = 19;                              // street level, no further (every flyTo / fitBounds stays under this)
+const MAX_BOUNDS = [[3.0, 50.585], [3.095, 50.68]];
 const OBS_ZOOM = 16;                              // obstacles appear on the map from this zoom level
 const TAP_GUARD_MS = 350;                         // ignore the 2nd tap of a double-tap after a screen change
 
@@ -167,8 +170,8 @@ const map = new maplibregl.Map({
   style: `https://tiles.openfreemap.org/styles/${DARK ? 'dark' : 'liberty'}`,
   bounds: [[BBOX.w, BBOX.s], [BBOX.e, BBOX.n]],              // opens on the whole district
   fitBoundsOptions: { padding: { top: 130, bottom: 110, left: 14, right: 14 } },
-  maxBounds: [[3.0, 50.585], [3.095, 50.68]],                // you can look around Lille; only Vauban is active (the rest is grayed out)
-  minZoom: 11,
+  maxBounds: MAX_BOUNDS,              // you can look around Lille; only Vauban is active (the rest is grayed out)
+  minZoom: 11, maxZoom: MAX_ZOOM,
   maxPitch: 0, pitchWithRotate: false, touchPitch: false,   // flat 2D: no tilting. Turning the map (drag with the right mouse button / Ctrl, two-finger twist, buttons) is always allowed
   attributionControl: { compact: true }
 });
@@ -507,7 +510,7 @@ function locate() {
       if (!p) { fixState = 'outside'; setPickHelp('pick.now.outside'); return; }
       const { lng, lat } = p;
       fix = { lng, lat, acc: p.snapped ? Math.max(acc, 30) : acc }; fixState = 'ok';
-      map.flyTo({ center: [lng, lat], zoom: 17.5, duration: 600 });
+      map.flyTo({ center: [lng, lat], zoom: Math.min(17.5, MAX_ZOOM), duration: 600 });
       if (p.snapped) setPickHelp('pick.now.edge');
       else setPickHelp(acc > LOW_ACC_M ? 'pick.now.lowacc' : 'pick.now.found', { m: Math.round(acc) });
     },
@@ -739,6 +742,7 @@ $('form').addEventListener('submit', async (e) => {
 
 /* ---------- boot ---------- */
 const chat = initChat({ map, t, getLang: () => lang, $, dark: DARK });
+const search = initSearch({ map, t, getLang: () => lang, bounds: MAX_BOUNDS, maxZoom: MAX_ZOOM });
 /* the assistant is experimental: off until switched on in Settings, remembered on this phone */
 $('set-chat').checked = store.get('chat') === '1';
 chat.setEnabled($('set-chat').checked);

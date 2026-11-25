@@ -29,6 +29,8 @@ export const TUNING = {                              // sizes in metres: change 
   bench: 0.8
 };
 
+const PALETTE_SIZE = 8;                              // colours per tree palette (see C.trees)
+
 // the crown polygons in the data are the full measured canopy (often 15-30 m wide). Drawn like that they cover whole streets,
 // so each one is shrunk towards its own centre (cx, cy): scaled by crownScale and capped at crownMaxR metres of radius
 function shrinkCrowns(fc) {
@@ -40,7 +42,8 @@ function shrinkCrowns(fc) {
     const ring = f.geometry.coordinates[0];
     const r = Math.max(...ring.map(([x, y]) => Math.hypot((x - cx) * M * k, (y - cy) * M)));
     const m = r > 0 ? Math.min(TUNING.crownScale, TUNING.crownMaxR / r) : 1;
-    return { ...f, geometry: { type: 'Polygon', coordinates: [ring.map(([x, y]) => [cx + (x - cx) * m, cy + (y - cy) * m])] } };
+    const ci = Math.abs(Math.imul(Math.round(cx * 1e6), 73856093) ^ Math.imul(Math.round(cy * 1e6), 19349663)) % PALETTE_SIZE;   // fixed colour per tree
+    return { ...f, properties: { ...f.properties, ci }, geometry: { type: 'Polygon', coordinates: [ring.map(([x, y]) => [cx + (x - cx) * m, cy + (y - cy) * m])] } };
   }));
 }
 
@@ -89,11 +92,40 @@ async function load(name) {
   catch (e) { console.warn('layer not loaded:', name, e.message); return null; }
 }
 
+// a small transparent tile with a few scattered leaves (drawn at 2x, used as a fill-pattern)
+function leafPattern(colors) {
+  const S = 64, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+  [[14, 16, 0.5, 0], [44, 12, 2.3, 1], [30, 36, 4.1, 0], [10, 50, 1.3, 1], [52, 46, 3.2, 0], [34, 58, 5.4, 1]].forEach(([x, y, a, k]) => {
+    g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = colors[k];
+    g.beginPath(); g.moveTo(-5, 0); g.quadraticCurveTo(0, -4.5, 5, 0); g.quadraticCurveTo(0, 4.5, -5, 0); g.fill();   // pointed leaf
+    g.restore();
+  });
+  return g.getImageData(0, 0, S, S);
+}
+
+// Base-map roads keep growing with the zoom: from z16 their width follows real metres (doubles every zoom level),
+// so they stay in proportion with our buildings and crossings. Below z16 the style is left as it is.
+const ROAD_M = [[/rail|hatching|subtle|pier|path/, 0],   // 0 = left as it is (rail, pier, footpaths: their dashes would turn into big squares)
+   [/motorway_link|_link/, 6], [/motorway/, 18], [/trunk_primary/, 14], [/secondary_tertiary|highway_major/, 11],
+  [/minor|street/, 7], [/service_track/, 4.5]];   // width in metres by road class
+function widenRoads(map, lat = 50.636) {
+  const mpp = (z) => 78271.517 * Math.cos((lat * Math.PI) / 180) / 2 ** z;   // metres per pixel at zoom z
+  for (const l of map.getStyle().layers) {
+    if (l.type !== 'line' || !/^(road_|bridge_|tunnel_|highway_)/.test(l.id)) continue;   // liberty uses road_*, the dark style highway_*
+    const w = (ROAD_M.find(([re]) => re.test(l.id)) || [])[1], expr = l.paint && l.paint['line-width'];
+    if (!w || !Array.isArray(expr) || expr[0] !== 'interpolate') continue;
+    const m = l.id.endsWith('_casing') ? w + 1.6 : w;                          // the casing is a little wider than the road
+    const keep = expr.slice(3).reduce((a, v, i, all) => (i % 2 === 0 && v < 16 ? a.concat([v, all[i + 1]]) : a), []);
+    map.setPaintProperty(l.id, 'line-width', ['interpolate', ['exponential', 2], ['zoom'], ...keep, 16, m / mpp(16), 20, m / mpp(20)]);
+  }
+}
+
 // ---- add everything to the map. Returns controls for the Settings screen.
 export async function addVaubanLayers(map, dark = false) {
   const C = dark
-    ? { bldg: '#3a4452', bldgLine: '#566274', bldg3d: '#4d586a', tree: '#3f8a5a', tree3d: '#3f8a5a', casing: '#10161d', mk1: '#f5f7fa', mk2: '#6f7b8a', red: '#ff6b6b', yellow: '#ffd23f', green: '#4ade80', orange: '#ffa63d', pole: '#8b96a3' }
-    : { bldg: '#d3dae2', bldgLine: '#aab5c2', bldg3d: '#dfe4ea', tree: '#6fb37a', tree3d: '#5aa46b', casing: '#ffffff', mk1: '#111418', mk2: '#9aa3ad', red: '#d62828', yellow: '#f2b705', green: '#1e9e48', orange: '#f07b00', pole: '#4b5560' };
+    ? { bldg: '#3a4452', bldgLine: '#566274', bldg3d: '#4d586a', trees: ['#2f6f48', '#3f7d3a', '#66802f', '#7c883a', '#25583a', '#52702c', '#8a8c46', '#2f7358'], leaves: ['rgba(120,170,90,.4)', 'rgba(180,190,100,.35)'], casing: '#10161d', mk1: '#f5f7fa', mk2: '#6f7b8a', red: '#ff6b6b', yellow: '#ffd23f', green: '#4ade80', orange: '#ffa63d', pole: '#8b96a3' }
+    : { bldg: '#d3dae2', bldgLine: '#aab5c2', bldg3d: '#dfe4ea', trees: ['#5fae6b', '#7bbf5a', '#a4c94f', '#c3d35a', '#3f8f58', '#8aa83c', '#d6d86a', '#4f9d63'], leaves: ['rgba(70,140,60,.42)', 'rgba(190,200,70,.5)'], casing: '#ffffff', mk1: '#111418', mk2: '#9aa3ad', red: '#d62828', yellow: '#f2b705', green: '#1e9e48', orange: '#f07b00', pole: '#4b5560' };
+  widenRoads(map);
   const data = Object.fromEntries(await Promise.all(['buildings', 'trees', 'lamps', 'signals', 'benches', 'crossings', 'parking', 'bus'].map(async (n) => [n, await load(n)])));
   // a crossing is a MultiLineString of stripes: one line per stripe, numbered along the crossing, so the stripes can take turns in colour
   data.trees = shrinkCrowns(data.trees);
@@ -113,9 +145,17 @@ export async function addVaubanLayers(map, dark = false) {
     src('trunks', trunks3d(data.trees));
     // flat tree crowns go UNDER the base map's roads (the first tunnel_/road_/bridge_ layer), so a crown never hides a street, a name or a crossing
     const underRoads = (map.getStyle().layers.find((l) => /^(tunnel_|road_|bridge_)/.test(l.id)) || {}).id || BEFORE;
-    map.addLayer({ id: 'trees-flat', type: 'fill', source: 'trees', minzoom: 15, paint: { 'fill-color': C.tree, 'fill-opacity': dark ? 0.7 : 0.62 } }, underRoads);
+    const treeColor = ['match', ['get', 'ci'], ...C.trees.flatMap((c, i) => [i, c]), C.trees[0]];   // varied greens, one per tree
+    // soft leaves on the grass: ONE small tiled pattern, so it stays cheap (no per-leaf features); under the roads, below the crowns
+    if (!map.hasImage('leaves')) map.addImage('leaves', leafPattern(C.leaves), { pixelRatio: 2 });
+    [['leaves-grass', 'landcover', ['==', ['get', 'class'], 'grass']], ['leaves-park', 'park', null]].forEach(([id, sl, filter]) => {
+      if (!map.getSource('openmaptiles')) return;
+      map.addLayer({ id, type: 'fill', source: 'openmaptiles', 'source-layer': sl, ...(filter ? { filter } : {}), minzoom: 15,
+        paint: { 'fill-pattern': 'leaves', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0, 16, 1] } }, underRoads);
+    });
+    map.addLayer({ id: 'trees-flat', type: 'fill', source: 'trees', minzoom: 15, paint: { 'fill-color': treeColor, 'fill-opacity': dark ? 0.7 : 0.62 } }, underRoads);
     add({ id: 'trees-3d', type: 'fill-extrusion', source: 'trees', minzoom: 15, layout: { visibility: 'none' },
-      paint: { 'fill-extrusion-color': C.tree3d, 'fill-extrusion-height': ['get', 'z'], 'fill-extrusion-base': ['*', ['get', 'z'], TUNING.crownBase], 'fill-extrusion-opacity': 0.92 } });
+      paint: { 'fill-extrusion-color': treeColor, 'fill-extrusion-height': ['get', 'z'], 'fill-extrusion-base': ['*', ['get', 'z'], TUNING.crownBase], 'fill-extrusion-opacity': 0.92 } });
     add({ id: 'trunks-3d', type: 'fill-extrusion', source: 'trunks', minzoom: 16, layout: { visibility: 'none' },
       paint: { 'fill-extrusion-color': '#7a5a3c', 'fill-extrusion-height': ['get', 't'], 'fill-extrusion-base': 0 } });
   }
@@ -146,7 +186,7 @@ export async function addVaubanLayers(map, dark = false) {
   // which map layers belong to which switch, in flat 2D and in 3D
   const MAP = {
     buildings: { flat: ['bldg-flat'], d3: ['bldg-3d'] },
-    trees:     { flat: ['trees-flat'], d3: ['trees-3d', 'trunks-3d'] },
+    trees:     { flat: ['trees-flat', 'leaves-grass', 'leaves-park'], d3: ['trees-3d', 'trunks-3d', 'leaves-grass', 'leaves-park'] },   // the leaf pattern is ground texture: it stays in 3D too
     lamps:     { flat: ['lamps-dot'], d3: ['lamps-3d'] },
     signals:   { flat: ['signals-dot'], d3: ['signals-3d'] },
     benches:   { flat: ['benches-dot'], d3: ['benches-3d'] },
